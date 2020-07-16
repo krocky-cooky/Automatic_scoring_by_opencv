@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<head>
+    <!--jqueryとsemantic-uiを用いた-->
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.3.3/semantic.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.3.3/semantic.min.js"></script>
+    <style type="text/css">
+    body{
+        background-color:  teal;
+        background : url(/media/desk.jpg) center/cover;
+        background-size : cover
+    }
+    .container {
+        margin : 0 20% 0 20%;
+        padding : 100px 0 0 0 ;
+        text-align : center;
+    }
+    .title{
+        text-align: left;
+    }
+    table{
+        margin-top : 30px;
+        font-size:large;
+        width : 100%;
+        border-collapse: collapse;
+    }
+    .red{
+        color : red;
+    }
+    .blue{
+        color : blue;
+    }
+    td{
+        padding-top : 10px;
+        padding-bottom : 10px; 
+    }
+    .float{
+        box-shadow: 7px 7px 10px 3px rgb(182, 189, 186); 
+    }
+    .button-wrap{
+        display : inline-block;
+        text-align : center;
+        transition : 0.5s;
+        padding : 0;
+    }
+    #evaluation{
+        margin-top : 50px;
+        margin-bottom : 30px;
+        font-size: 7em;
+        color : red;
+    }
+    </style>
+    
+</head>
+<body>
+    <div class="container">
+        <div class="container2">
+            <div class="" style="">
+        <h1>答案自動採点</h1>
+        <hr>
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div style="padding:0 20% 0 20%;margin-bottom:20px">
+            <div id=file-input" class="ui segment">
+                <div class="ui header">
+                    {{form.file.label_tag}}選択
+                </div>       
+                <div class="ui divider"></div>     
+                      {{form.file}}
+                      <div class="ui divider"></div>
+            </div>
+            </div>
+            <div class="button-wrap">
+            <button class="huge ui blue fluid button" id="pushed" type="submit">採点</button>
+            </div>
+        </form> 
+        <div>
+        <div class="ui segment" style="margin-top:20px;display:none;margin-bottom:10px" id="result">
+            <h2>採点結果</h2>
+            <div class="ui dimmer" id="loading">
+                <div class="ui text massive loader">採点中</div>
+            </div>
+            <div class="ui divider"></div>  
+            <div style="display:flex">
+                <div class="ui black inverted segment" style="flex-basis: 50%;">   
+        <img id="get" style="width:100%" num="0"></img>
+                </div>
+                <div  style="flex-basis: 50%;padding:50px 20px 0 20px" id="score">
+                    <div class="title"><h3>学籍番号</h3></div>
+                    <div id="s-num"></div>
+                    <div class="ui divider"></div>
+                    <div class="title"><h3>得点</h3></div>
+                    <div id="point"></div>
+                    <div class="ui divider"></div>
+                    <div style="padding:0 10% 0 10%">
+                    <table id="ans" border="1" bordercolor="black">
+                    </table>
+                    </div>
+                    <div class="ui divider"></div>
+                    <div class="title"><h3>評価</h3></div>
+                    <div id="evaluation"></div>
+                </div>
+        </div>
+        </div>
+        </div>
+        </div>
+        </div>
+    </div>
+<script type="text/javascript">
+    $(function(){
+        //djangoに付属のcsrfトークンへの処理のテンプレート
+        var csrftoken = getCookie('csrftoken');
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
+            }
+        }
+        });
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = jQuery.trim(cookies[i]);
+                // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                }
+            }
+        }
+        return cookieValue;
+        }
+
+        function csrfSafeMethod(method) {
+        // these HTTP methods do not require CSRF protection
+            return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+        }
+        //ボタンが浮いてるように見える
+        $('.button-wrap').mouseover(function(){
+            $(this).addClass('float');
+        })
+        $('.button-wrap').mouseout(function(){
+            $(this).removeClass('float');
+            //console.log($(this).prop("tagName"))
+        })
+
+
+        //以下、採点ボタンが押されることで発火するイベント。ajax通信を含む。
+        //ファイルを送信してからレスポンスが帰ってくるまでローディングマークを写す
+        //返ってきたデータに基づいて集計結果や採点結果の画像をhtmlに表示する
+        $('#pushed').on('click',function(e){
+            e.preventDefault();
+            //console.log($(this).prop("tagName"))
+            var PushedButton = $(this)
+            PushedButton.addClass('disabled');
+            $('#s-num,#point,#ans,#evaluation').empty();
+            $('#result').show();
+            $('#loading').addClass('active');
+            let url = "/saiten/";
+            let file = $('#id_file').prop('files')[0];
+            let fd = new FormData();
+            fd.append('file',file);
+            $.ajax({
+                'type' : "POST",
+                'url' : url,
+                'processData': false,
+                'contentType': false,
+                'data' : fd
+            }).then(
+                data => {
+                    evaluation_list = ["不可ww","可","良","優","優上"];
+                    $('#loading').removeClass('active')
+                    PushedButton.removeClass('disabled');
+                    $('#s-num').prepend('<h1>' + data.student_number + '</h1>');   
+                    $('#get').attr('src',data.file_url + '?' + $('#get').attr('num'));
+                    var num = Number($('#get').attr('num'));
+                    num ++ ;
+                    $('#get').attr('num',num);
+                    $('#point').append('<h1 style="color:red;">' + data.score + '</h1>');
+                    $('#ans').append('<tr><td>問題番号</td><td>結果</td></tr>');
+                    for(var i = 1; i < Object.keys(data.table).length ; ++i){
+                        var sig = '';
+                        var cls = '';
+                        if(data.table[i] === 'ok'){
+                            sig = '正解';
+                            cls = 'red';
+                        }else if(data.table[i] === 'notok'){
+                            sig = '不正解';
+                            cls = 'blue';
+                        }
+                        $('#ans').append('<tr><td>' + i + '</td><td class=\"' + cls + '\">' + sig + '</td></tr>');
+                    }
+                    $('#evaluation').append(evaluation_list[data.score]);
+                },
+                error =>{
+                    alert("失敗しました");
+                    $('#loading').removeClass('active');
+                    PushedButton.removeClass('disabled');
+
+                }
+            )
+        })
+    })
+</script>  
+</body>
